@@ -1,12 +1,18 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod logging;
+
 use tauri::menu::MenuBuilder;
 use tauri::tray::TrayIconBuilder;
 use tauri::{image::Image, Manager};
 
 fn main() {
+    // Initialize logging - guard must be kept alive for app lifetime
+    let _log_guard = logging::init_logging();
+
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![logging::show_logs])
         .setup(|app| {
             // Get the main window
             let window = app.get_webview_window("main").unwrap();
@@ -52,7 +58,7 @@ fn main() {
                             println!("Preferences selected");
                         }
                         "show-logs" => {
-                            println!("Show Logs selected");
+                            logging::open_log_dir();
                         }
                         id => {
                             println!("menu item clicked: {}", id);

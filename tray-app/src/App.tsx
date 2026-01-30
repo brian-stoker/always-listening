@@ -1,7 +1,34 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { listen } from '@tauri-apps/api/event'
+import Preferences from './Preferences'
+
+type View = 'status' | 'preferences'
 
 function App() {
   const [status, setStatus] = useState<'idle' | 'listening' | 'recording'>('idle')
+  const [view, setView] = useState<View>('status')
+
+  useEffect(() => {
+    // Check if this window was opened as the preferences window
+    const label = window.__TAURI_INTERNALS__?.metadata?.currentWindow?.label
+    if (label === 'preferences') {
+      setView('preferences')
+      return
+    }
+
+    // Listen for the open-preferences event from the tray menu
+    const unlisten = listen('open-preferences', () => {
+      setView('preferences')
+    })
+
+    return () => {
+      unlisten.then((fn) => fn())
+    }
+  }, [])
+
+  if (view === 'preferences') {
+    return <Preferences />
+  }
 
   return (
     <div className="container">

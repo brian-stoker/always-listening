@@ -21,6 +21,17 @@
         "visible": false,
         "decorations": true,
         "alwaysOnTop": false
+      },
+      {
+        "label": "preferences",
+        "title": "Preferences",
+        "width": 500,
+        "height": 450,
+        "visible": false,
+        "resizable": true,
+        "center": true,
+        "decorations": true,
+        "fullscreen": false
       }
     ],
     "security": {

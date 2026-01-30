@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { Config } from './types'
+import GeneralTab from './tabs/GeneralTab'
 import './preferences.css'
 
 type TabId = 'general' | 'audio' | 'pipeline'
@@ -16,14 +18,9 @@ const tabs: TabDef[] = [
   { id: 'pipeline', label: 'Pipeline' },
 ]
 
-interface Config {
-  [key: string]: unknown
-}
-
 function Preferences() {
   const [activeTab, setActiveTab] = useState<TabId>('general')
-  const [config, setConfig] = useState<Config>({})
-  const [isDirty, setIsDirty] = useState(false)
+  const [config, setConfig] = useState<Config | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -41,10 +38,15 @@ function Preferences() {
     }
   }
 
+  function handleConfigChange(updates: Partial<Config>) {
+    if (config) {
+      setConfig({ ...config, ...updates })
+    }
+  }
+
   async function handleSave() {
     try {
-      await invoke('update_config', { config })
-      setIsDirty(false)
+      await invoke('update_config', { newConfig: config })
       const win = getCurrentWindow()
       await win.close()
     } catch (err) {
@@ -58,16 +60,10 @@ function Preferences() {
   }
 
   function renderTabContent() {
+    if (!config) return null
     switch (activeTab) {
       case 'general':
-        return (
-          <div className="tab-content">
-            <h3>General Settings</h3>
-            <p className="placeholder-text">
-              General preferences will be configured here.
-            </p>
-          </div>
-        )
+        return <GeneralTab config={config} onChange={handleConfigChange} />
       case 'audio':
         return (
           <div className="tab-content">

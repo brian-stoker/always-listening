@@ -201,7 +201,10 @@ fn main() {
                             handle_mode_toggle(app, Mode::Combined);
                         }
                         "preferences" => {
-                            tracing::info!("Preferences selected");
+                            if let Some(win) = app.get_webview_window("preferences") {
+                                let _ = win.show();
+                                let _ = win.set_focus();
+                            }
                         }
                         "show-logs" => {
                             logging::open_log_dir();

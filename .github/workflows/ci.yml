@@ -1,0 +1,224 @@
+name: CI
+
+on:
+  push:
+    branches: [main, project/*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-typecheck:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./tray-app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: tray-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript type check
+        run: npm run typecheck
+
+  build-macos:
+    name: Build (macOS)
+    runs-on: macos-latest
+    needs: lint-and-typecheck
+    defaults:
+      run:
+        working-directory: ./tray-app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: tray-app/package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: 'tray-app/src-tauri -> target'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Import Apple Developer Certificate
+        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create a temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          # Decode certificate from base64
+          echo "$APPLE_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
+
+          # Create and configure keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import certificate into keychain
+          security import $RUNNER_TEMP/certificate.p12 \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # Clean up certificate file
+          rm -f $RUNNER_TEMP/certificate.p12
+
+      - name: Build Tauri app
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run build
+
+      - name: Notarize macOS app
+        if: ${{ secrets.APPLE_ID != '' && secrets.APPLE_TEAM_ID != '' && secrets.APPLE_PASSWORD != '' }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # Find the built .app bundle
+          APP_PATH=$(find src-tauri/target/release/bundle/macos -name "*.app" -maxdepth 1 | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app bundle found, skipping notarization"
+            exit 0
+          fi
+
+          # Create a zip for notarization
+          ZIP_PATH="$RUNNER_TEMP/app-for-notarization.zip"
+          ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
+
+          # Submit for notarization
+          xcrun notarytool submit "$ZIP_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          # Staple the notarization ticket
+          xcrun stapler staple "$APP_PATH"
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          if [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain $KEYCHAIN_PATH
+          fi
+
+      - name: Upload macOS artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: |
+            tray-app/src-tauri/target/release/bundle/macos/*.app
+            tray-app/src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: warn
+
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    needs: lint-and-typecheck
+    defaults:
+      run:
+        working-directory: ./tray-app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: tray-app/package-lock.json
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: 'tray-app/src-tauri -> target'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Import Windows code signing certificate
+        if: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+        shell: powershell
+        run: |
+          $pfxBytes = [Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE }}")
+          $pfxPath = Join-Path $env:RUNNER_TEMP "certificate.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+          $securePassword = ConvertTo-SecureString "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" -AsPlainText -Force
+          Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
+          Remove-Item $pfxPath
+
+      - name: Build Tauri app
+        run: npm run build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.WINDOWS_CERTIFICATE }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+
+      - name: Sign Windows executable
+        if: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+        shell: powershell
+        run: |
+          $exePath = Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -Filter "*.exe" | Select-Object -First 1
+          if ($exePath) {
+            $cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Select-Object -First 1
+            if ($cert) {
+              Set-AuthenticodeSignature -FilePath $exePath.FullName -Certificate $cert -TimestampServer "http://timestamp.digicert.com" -HashAlgorithm SHA256
+              Write-Host "Signed: $($exePath.FullName)"
+            } else {
+              Write-Host "No code signing certificate found in store"
+            }
+          } else {
+            Write-Host "No .exe found to sign"
+          }
+
+      - name: Upload Windows artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            tray-app/src-tauri/target/release/bundle/msi/*.msi
+            tray-app/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: warn

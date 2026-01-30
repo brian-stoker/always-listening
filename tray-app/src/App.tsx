@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import Preferences from './Preferences'
+import SetupWizard from './SetupWizard'
 
-type View = 'status' | 'preferences'
+type View = 'status' | 'preferences' | 'setup'
 
 function App() {
   const [status, setStatus] = useState<'idle' | 'listening' | 'recording'>('idle')
@@ -10,11 +12,18 @@ function App() {
 
   useEffect(() => {
     // Check if this window was opened as the preferences window
-    const label = window.__TAURI_INTERNALS__?.metadata?.currentWindow?.label
+    const label = (window as any).__TAURI_INTERNALS__?.metadata?.currentWindow?.label
     if (label === 'preferences') {
       setView('preferences')
       return
     }
+
+    // Check for first run
+    invoke<boolean>('is_first_run_check').then((isFirstRun) => {
+      if (isFirstRun) {
+        setView('setup')
+      }
+    }).catch(() => {})
 
     // Listen for the open-preferences event from the tray menu
     const unlisten = listen('open-preferences', () => {
@@ -25,6 +34,10 @@ function App() {
       unlisten.then((fn) => fn())
     }
   }, [])
+
+  if (view === 'setup') {
+    return <SetupWizard onComplete={() => setView('status')} />
+  }
 
   if (view === 'preferences') {
     return <Preferences />

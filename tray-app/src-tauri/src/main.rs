@@ -8,6 +8,7 @@ mod docker;
 mod ha_client;
 mod logging;
 mod process_manager;
+mod setup;
 mod state;
 mod voice_pipeline;
 
@@ -169,6 +170,8 @@ fn main() {
             docker::check_ha_container_status,
             docker::start_ha,
             docker::setup_ha,
+            setup::check_dependencies,
+            setup::is_first_run_check,
         ])
         .manage(AppStateManager::new())
         .manage(Arc::new(TokioMutex::new(config::Config::load())))

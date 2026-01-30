@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod combined;
 mod config;
 mod dictation;
 mod logging;
@@ -121,8 +122,12 @@ fn handle_mode_toggle(app: &tauri::AppHandle, mode: Mode) {
                 });
             }
             Mode::Combined => {
-                // Combined mode will be implemented in Phase 2.5
-                tracing::info!("Combined mode selected (pending implementation)");
+                tokio::spawn(async move {
+                    let pipeline = combined::CombinedPipeline::new(pm, config, shutdown_rx);
+                    if let Err(e) = pipeline.run().await {
+                        tracing::error!("Combined pipeline error: {}", e);
+                    }
+                });
             }
         }
     }

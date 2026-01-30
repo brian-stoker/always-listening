@@ -216,14 +216,15 @@ impl Config {
 
 /// Tauri commands for config access
 #[tauri::command]
-pub fn get_config(config: tauri::State<'_, std::sync::Mutex<Config>>) -> Config {
-    config.lock().unwrap().clone()
+pub async fn get_config(config: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<Config>>>) -> Result<Config, String> {
+    Ok(config.lock().await.clone())
 }
 
 #[tauri::command]
-pub fn update_config(config: tauri::State<'_, std::sync::Mutex<Config>>, new_config: Config) {
-    let mut cfg = config.lock().unwrap();
+pub async fn update_config(config: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<Config>>>, new_config: Config) -> Result<(), String> {
+    let mut cfg = config.lock().await;
     *cfg = new_config;
     cfg.save();
     tracing::info!("Config updated and saved");
+    Ok(())
 }

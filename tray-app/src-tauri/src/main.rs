@@ -2,14 +2,18 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
+mod dictation;
 mod logging;
 mod process_manager;
 mod state;
+mod voice_pipeline;
 
 use tauri::menu::{MenuBuilder, CheckMenuItemBuilder};
 use tauri::tray::TrayIconBuilder;
 use tauri::{image::Image, Emitter, Manager};
 use state::{AppStateManager, Mode};
+use std::sync::Arc;
+use tokio::sync::{Mutex as TokioMutex, watch};
 
 /// Build the tray menu with checkmarks based on the active mode
 fn build_menu(app: &tauri::AppHandle, active_mode: Option<Mode>) -> Result<tauri::menu::Menu<tauri::Wry>, Box<dyn std::error::Error>> {
@@ -62,27 +66,75 @@ fn get_app_state(state_manager: tauri::State<'_, AppStateManager>) -> state::App
     state_manager.get_state()
 }
 
-/// Handle mode toggle - update state, icon, and menu
-fn handle_mode_toggle(app: &tauri::AppHandle, mode: Mode) {
-    // Get the state manager
-    let state_manager = app.state::<AppStateManager>();
+/// Pipeline shutdown sender - stored as managed state
+struct PipelineShutdown(std::sync::Mutex<Option<watch::Sender<bool>>>);
 
-    // Toggle the mode
+/// Handle mode toggle - update state, icon, menu, and start/stop pipelines
+fn handle_mode_toggle(app: &tauri::AppHandle, mode: Mode) {
+    let state_manager = app.state::<AppStateManager>();
     let new_state = state_manager.toggle_mode(mode);
 
-    // Log the state change
     tracing::info!("State changed to: {:?}", new_state);
+
+    // Stop any running pipeline
+    {
+        let shutdown = app.state::<PipelineShutdown>();
+        let mut guard = shutdown.0.lock().unwrap();
+        if let Some(tx) = guard.take() {
+            let _ = tx.send(true);
+        }
+    }
+
+    // Start pipeline if a mode is now active
+    if let Some(active_mode) = new_state.active_mode() {
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        {
+            let shutdown = app.state::<PipelineShutdown>();
+            let mut guard = shutdown.0.lock().unwrap();
+            *guard = Some(shutdown_tx);
+        }
+
+        let config = app.state::<Arc<TokioMutex<config::Config>>>();
+        let config = config.inner().clone();
+        let pm = app.state::<Arc<process_manager::ProcessManager>>();
+        let pm = pm.inner().clone();
+
+        match active_mode {
+            Mode::VoiceToClaude => {
+                tokio::spawn(async move {
+                    let mut pipeline = voice_pipeline::VoicePipeline::new(pm, config, shutdown_rx);
+                    if let Err(e) = pipeline.run().await {
+                        tracing::error!("Voice pipeline error: {}", e);
+                    }
+                });
+            }
+            Mode::Dictation => {
+                tokio::spawn(async move {
+                    let pipeline = dictation::DictationPipeline::new(config, shutdown_rx.clone());
+                    // Dictation waits for trigger events - run in a loop
+                    loop {
+                        if *shutdown_rx.borrow() { break; }
+                        if let Err(e) = pipeline.run_once().await {
+                            tracing::error!("Dictation error: {}", e);
+                        }
+                    }
+                });
+            }
+            Mode::Combined => {
+                // Combined mode will be implemented in Phase 2.5
+                tracing::info!("Combined mode selected (pending implementation)");
+            }
+        }
+    }
 
     // Update the tray icon
     if let Some(tray) = app.tray_by_id("main-tray") {
-        // Update icon based on new state
         if let Ok(new_icon) = get_icon_for_state(new_state) {
             if let Err(e) = tray.set_icon(Some(new_icon)) {
                 tracing::error!("Failed to set tray icon: {}", e);
             }
         }
 
-        // Rebuild menu with updated checkmarks
         if let Ok(new_menu) = build_menu(app, new_state.active_mode()) {
             if let Err(e) = tray.set_menu(Some(new_menu)) {
                 tracing::error!("Failed to set tray menu: {}", e);
@@ -107,8 +159,9 @@ fn main() {
             config::update_config,
         ])
         .manage(AppStateManager::new())
-        .manage(std::sync::Mutex::new(config::Config::load()))
-        .manage(process_manager::ProcessManager::new())
+        .manage(Arc::new(TokioMutex::new(config::Config::load())))
+        .manage(Arc::new(process_manager::ProcessManager::new()))
+        .manage(PipelineShutdown(std::sync::Mutex::new(None)))
         .setup(|app| {
             // Get the main window
             let window = app.get_webview_window("main").unwrap();

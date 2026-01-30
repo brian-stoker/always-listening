@@ -1,7 +1,9 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod config;
 mod logging;
+mod process_manager;
 mod state;
 
 use tauri::menu::{MenuBuilder, CheckMenuItemBuilder};
@@ -98,8 +100,15 @@ fn main() {
     let _log_guard = logging::init_logging();
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![logging::show_logs, get_app_state])
+        .invoke_handler(tauri::generate_handler![
+            logging::show_logs,
+            get_app_state,
+            config::get_config,
+            config::update_config,
+        ])
         .manage(AppStateManager::new())
+        .manage(std::sync::Mutex::new(config::Config::load()))
+        .manage(process_manager::ProcessManager::new())
         .setup(|app| {
             // Get the main window
             let window = app.get_webview_window("main").unwrap();

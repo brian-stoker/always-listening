@@ -4,6 +4,7 @@
 mod combined;
 mod config;
 mod dictation;
+mod docker;
 mod ha_client;
 mod logging;
 mod process_manager;
@@ -164,6 +165,10 @@ fn main() {
             config::get_config,
             config::update_config,
             ha_client::test_ha_connection,
+            docker::check_docker,
+            docker::check_ha_container_status,
+            docker::start_ha,
+            docker::setup_ha,
         ])
         .manage(AppStateManager::new())
         .manage(Arc::new(TokioMutex::new(config::Config::load())))

@@ -6,9 +6,10 @@ import GeneralTab from './tabs/GeneralTab'
 import AudioTab from './tabs/AudioTab'
 import PipelineTab from './tabs/PipelineTab'
 import HomeAssistantTab from './tabs/HomeAssistantTab'
+import DockerSetupTab from './tabs/DockerSetupTab'
 import './preferences.css'
 
-type TabId = 'general' | 'audio' | 'pipeline' | 'homeassistant'
+type TabId = 'general' | 'audio' | 'pipeline' | 'homeassistant' | 'docker'
 
 interface TabDef {
   id: TabId
@@ -20,6 +21,7 @@ const tabs: TabDef[] = [
   { id: 'audio', label: 'Audio' },
   { id: 'pipeline', label: 'Pipeline' },
   { id: 'homeassistant', label: 'Home Assistant' },
+  { id: 'docker', label: 'Docker Setup' },
 ]
 
 function Preferences() {
@@ -74,6 +76,8 @@ function Preferences() {
         return <PipelineTab config={config} onChange={handleConfigChange} />
       case 'homeassistant':
         return <HomeAssistantTab config={config} onChange={handleConfigChange} />
+      case 'docker':
+        return <DockerSetupTab config={config} onChange={handleConfigChange} />
     }
   }
 

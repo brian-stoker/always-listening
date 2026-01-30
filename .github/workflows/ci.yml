@@ -94,5 +94,46 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Import Windows code signing certificate
+        if: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+        shell: powershell
+        run: |
+          $pfxBytes = [Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE }}")
+          $pfxPath = Join-Path $env:RUNNER_TEMP "certificate.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+          $securePassword = ConvertTo-SecureString "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" -AsPlainText -Force
+          Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
+          Remove-Item $pfxPath
+
       - name: Build Tauri app
         run: npm run build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.WINDOWS_CERTIFICATE }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+
+      - name: Sign Windows executable
+        if: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+        shell: powershell
+        run: |
+          $exePath = Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -Filter "*.exe" | Select-Object -First 1
+          if ($exePath) {
+            $cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Select-Object -First 1
+            if ($cert) {
+              Set-AuthenticodeSignature -FilePath $exePath.FullName -Certificate $cert -TimestampServer "http://timestamp.digicert.com" -HashAlgorithm SHA256
+              Write-Host "Signed: $($exePath.FullName)"
+            } else {
+              Write-Host "No code signing certificate found in store"
+            }
+          } else {
+            Write-Host "No .exe found to sign"
+          }
+
+      - name: Upload Windows artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            tray-app/src-tauri/target/release/bundle/msi/*.msi
+            tray-app/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: warn

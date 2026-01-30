@@ -50,8 +50,27 @@
     ],
     "macOS": {
       "minimumSystemVersion": "10.13",
+      "entitlements": "Entitlements.plist",
+      "exceptionDomain": "local",
       "infoPlist": {
-        "LSUIElement": true
+        "LSUIElement": true,
+        "NSMicrophoneUsageDescription": "Always Listening requires microphone access to capture audio for voice commands and dictation."
+      }
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.digicert.com",
+      "wix": {
+        "language": "en-US",
+        "upgradeCode": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      },
+      "nsis": {
+        "installMode": "both",
+        "displayLanguageSelector": false,
+        "languages": ["English"],
+        "headerImage": null,
+        "sidebarImage": null
       }
     }
   }

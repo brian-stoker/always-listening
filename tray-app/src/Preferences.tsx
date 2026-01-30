@@ -5,9 +5,10 @@ import { Config } from './types'
 import GeneralTab from './tabs/GeneralTab'
 import AudioTab from './tabs/AudioTab'
 import PipelineTab from './tabs/PipelineTab'
+import HomeAssistantTab from './tabs/HomeAssistantTab'
 import './preferences.css'
 
-type TabId = 'general' | 'audio' | 'pipeline'
+type TabId = 'general' | 'audio' | 'pipeline' | 'homeassistant'
 
 interface TabDef {
   id: TabId
@@ -18,6 +19,7 @@ const tabs: TabDef[] = [
   { id: 'general', label: 'General' },
   { id: 'audio', label: 'Audio' },
   { id: 'pipeline', label: 'Pipeline' },
+  { id: 'homeassistant', label: 'Home Assistant' },
 ]
 
 function Preferences() {
@@ -70,6 +72,8 @@ function Preferences() {
         return <AudioTab config={config} onChange={handleConfigChange} />
       case 'pipeline':
         return <PipelineTab config={config} onChange={handleConfigChange} />
+      case 'homeassistant':
+        return <HomeAssistantTab config={config} onChange={handleConfigChange} />
     }
   }
 

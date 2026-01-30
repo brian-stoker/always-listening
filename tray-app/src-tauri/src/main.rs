@@ -4,6 +4,7 @@
 mod combined;
 mod config;
 mod dictation;
+mod ha_client;
 mod logging;
 mod process_manager;
 mod state;
@@ -162,6 +163,7 @@ fn main() {
             get_app_state,
             config::get_config,
             config::update_config,
+            ha_client::test_ha_connection,
         ])
         .manage(AppStateManager::new())
         .manage(Arc::new(TokioMutex::new(config::Config::load())))

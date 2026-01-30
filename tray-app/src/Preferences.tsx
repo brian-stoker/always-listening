@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { Config } from './types'
 import GeneralTab from './tabs/GeneralTab'
+import AudioTab from './tabs/AudioTab'
+import PipelineTab from './tabs/PipelineTab'
 import './preferences.css'
 
 type TabId = 'general' | 'audio' | 'pipeline'
@@ -65,23 +67,9 @@ function Preferences() {
       case 'general':
         return <GeneralTab config={config} onChange={handleConfigChange} />
       case 'audio':
-        return (
-          <div className="tab-content">
-            <h3>Audio Settings</h3>
-            <p className="placeholder-text">
-              Audio input and processing settings will be configured here.
-            </p>
-          </div>
-        )
+        return <AudioTab config={config} onChange={handleConfigChange} />
       case 'pipeline':
-        return (
-          <div className="tab-content">
-            <h3>Pipeline Settings</h3>
-            <p className="placeholder-text">
-              Voice pipeline configuration will be managed here.
-            </p>
-          </div>
-        )
+        return <PipelineTab config={config} onChange={handleConfigChange} />
     }
   }
 

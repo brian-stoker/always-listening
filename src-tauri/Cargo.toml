@@ -1,0 +1,38 @@
+[package]
+name = "always-listening"
+version = "1.0.0"
+description = "Always Listening Voice Pipeline Tray App"
+authors = ["you"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-appender = "0.2"
+dirs = "5"
+toml = "0.8"
+tokio = { version = "1", features = ["process", "io-util", "sync", "rt-multi-thread", "macros", "time"] }
+anyhow = "1"
+reqwest = { version = "0.12", features = ["json"] }
+tauri-plugin-global-shortcut = "2"
+cpal = "0.15"
+whisper-rs = { version = "0.13", features = ["coreml"] } # Enable CoreML for macOS acceleration
+rubato = "0.14" # For high-quality resampling
+ringbuf = "0.3" # Lock-free SPSC ring buffer
+hound = "3.5"   # WAV handling
+webrtc-vad = "0.4" # Smart Voice Activity Detection
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[features]
+# This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]

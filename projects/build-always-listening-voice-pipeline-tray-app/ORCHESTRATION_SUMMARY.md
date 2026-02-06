@@ -34,9 +34,9 @@
 **Phase 2: Core Pipeline Integration**
 - 2.1: #10 - Configuration Loading and Migration
 - 2.2: #11 - Subprocess Manager and Process Group Handling
-- 2.3: #12 - Voice-to-Claude Mode (Mode 1) Integration
-- 2.4: #13 - Dictation Mode (Mode 2) Integration
-- 2.5: #14 - Combined Mode (Mode 3) Integration
+- 2.3: #12 - Voice-to-Claude Mode Integration
+- 2.4: #13 - Dictation Mode Integration
+- 2.5: #14 - Combined Mode Integration
 
 **Phase 3: Preferences & Configuration**
 - 3.1: #15 - Preferences Window Shell

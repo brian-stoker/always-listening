@@ -204,7 +204,7 @@ Implement a `ProcessManager` module in Rust that spawns, monitors, and terminate
 
 ---
 
-### 2.3 Voice-to-Claude Mode (Mode 1) Integration
+### 2.3 Voice-to-Claude Mode Integration
 Wire the "Voice-to-Claude" mode menu item to launch and manage the voice pipeline loop: record audio via ffmpeg, transcribe via Whisper CLI, send to Clawdbot, and speak the response via TTS. This replicates the logic of `voice-pipeline.sh` using the `ProcessManager`.
 
 **Implementation Details**
@@ -235,7 +235,7 @@ Wire the "Voice-to-Claude" mode menu item to launch and manage the voice pipelin
 
 ---
 
-### 2.4 Dictation Mode (Mode 2) Integration
+### 2.4 Dictation Mode Integration
 Wire the "Dictation" mode menu item to launch the dictation workflow: record audio, transcribe, and type the text at the current cursor position. This replicates `dictate.sh` with `--submit` behavior.
 
 **Implementation Details**
@@ -264,7 +264,7 @@ Wire the "Dictation" mode menu item to launch the dictation workflow: record aud
 
 ---
 
-### 2.5 Combined Mode (Mode 3) Integration
+### 2.5 Combined Mode Integration
 Wire the "Combined" mode menu item to run both Voice-to-Claude and Dictation concurrently, matching the behavior of `start.sh` with no flags (default mode 3). F18 controls the voice pipeline send signal, F19 triggers dictation.
 
 **Implementation Details**
